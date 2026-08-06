@@ -59,8 +59,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         'scroll-smooth font-sans antialiased'
       )}
     >
-      <head>
-        {styles && <style>{styles}</style>}
+      <head suppressHydrationWarning>
+        {styles && <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: styles }} />}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
       </head>
