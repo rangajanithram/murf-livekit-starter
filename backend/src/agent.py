@@ -20,12 +20,22 @@ logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
-# Change this prompt to change what your voice agent does.
-# See README.md for example prompts (customer support, language tutor, receptionist).
-SYSTEM_PROMPT = """You are a friendly, patient, and encouraging English language tutor for children in rural India.
-Your goal is to help them practice basic spoken English. 
-Speak clearly, keep your answers very short (1 or 2 sentences max), and ask simple questions to encourage them to speak back.
-Always be supportive and positive."""
+SYSTEM_PROMPT = """
+IDENTITY: You are Lexi, a friendly, patient, and encouraging English language tutor for children in rural India, working for a grassroots literacy NGO.
+
+OBJECTIVES: 
+Help children practice basic spoken English in a stress-free environment. Build their confidence by giving positive reinforcement. Keep them engaged by asking simple, relatable questions about their day or surroundings.
+
+KNOWLEDGE: You know basic English grammar, vocabulary, and conversational phrasing suitable for beginners. You do not know advanced pedagogy, medical psychology, or complex academic subjects.
+
+LANGUAGE: Use simple, clear, and warm language. You must seamlessly handle code-mixing. If the user speaks in Hindi or a mix of Hindi and English, you should understand them and reply in a supportive mix of Hindi and English, matching their register and formality. Keep it casual and encouraging.
+
+GUARDRAILS:
+Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that a child has a learning disability or medical issue. If a child expresses extreme distress, or asks questions far beyond language learning, use this exact escalation script: "I am just here to help with English practice. If you need help with other things, please talk to your teacher or parents."
+
+STYLE:
+Keep your answers extremely short, ideally just one or two simple sentences under 20 words. Speak at a relaxed, patient pace. Do not use any bullet points, asterisks, brackets, emojis, or formatting meant for a screen. 
+"""
 
 
 class Assistant(Agent):
@@ -50,7 +60,7 @@ class Assistant(Agent):
     #     return "sunny with a temperature of 70 degrees."
 
 
-server = AgentServer()
+server = AgentServer(load_threshold=10.0)
 
 
 def prewarm(proc: JobProcess):
@@ -72,7 +82,7 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3"),
+        stt=deepgram.STT(model="nova-3", language="hi"),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
@@ -130,8 +140,38 @@ async def my_agent(ctx: JobContext):
         ),
     )
 
+    import asyncio
+
+    async def silent_user_handler():
+        silence_count = 0
+        while True:
+            await asyncio.sleep(15)
+            # If the agent is currently idle or listening, it implies the user hasn't spoken and the agent isn't replying
+            current_state = str(session.agent_state).lower()
+            if current_state.endswith("idle") or current_state.endswith("listening"):
+                silence_count += 1
+                if silence_count == 1:
+                    await session.say("Are you still there? Tell me one English word you learned today.", allow_interruptions=True)
+                elif silence_count >= 2:
+                    await session.say("It looks like you stepped away. Let's practice later. Goodbye!", allow_interruptions=False)
+                    await asyncio.sleep(3)
+                    await ctx.room.disconnect()
+                    break
+            else:
+                # Reset if the user started speaking or the agent is doing something
+                silence_count = 0
+
     # Join the room and connect to the user
     await ctx.connect()
+
+    # Wait briefly to ensure the agent's audio track is fully published
+    await asyncio.sleep(2)
+
+    # Initial greeting
+    await session.say("Hi there! I am Lexi, your friendly English tutor. How are you doing today?", allow_interruptions=True)
+
+    # Start the silence timeout handler ONLY AFTER the agent is connected and has greeted
+    asyncio.create_task(silent_user_handler())
 
 
 if __name__ == "__main__":
