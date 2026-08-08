@@ -10,6 +10,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
+import { cn } from '@/lib/shadcn/utils';
 
 /**
  * Props for the AgentChatTranscript component.
@@ -52,7 +53,7 @@ export function AgentChatTranscript({
   ...props
 }: AgentChatTranscriptProps) {
   return (
-    <Conversation className={className} {...props}>
+    <Conversation className={cn('[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden', className)} {...props}>
       <ConversationContent>
         {messages.map((receivedMessage) => {
           const { id, timestamp, from, message } = receivedMessage;

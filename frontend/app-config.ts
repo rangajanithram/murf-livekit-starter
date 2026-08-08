@@ -33,25 +33,25 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Murf AI',
-  pageTitle: 'Voice Agent Starter',
-  pageDescription: 'A voice agent powered by Murf Falcon — the fastest TTS API',
+  companyName: 'Lexi Tutor',
+  pageTitle: 'Lexi - English Tutor',
+  pageDescription: 'मर्फ एआई द्वारा संचालित आपकी अंग्रेजी ट्यूटर (Your friendly English language tutor, powered by Murf AI)',
 
   supportsChatInput: true,
-  supportsVideoInput: true,
-  supportsScreenShare: true,
+  supportsVideoInput: false,
+  supportsScreenShare: false,
   isPreConnectBufferEnabled: true,
 
   logo: '/murf-logo.svg',
-  accent: '#6366F1',
+  accent: '#10B981', // Emerald 500
   logoDark: '/murf-logo-dark.svg',
-  accentDark: '#818cf8',
-  startButtonText: 'Start talking',
+  accentDark: '#34D399', // Emerald 400
+  startButtonText: 'सीखना शुरू करें (Start Learning)',
 
   // optional: audio visualization configuration
-  audioVisualizerType: 'aura',
-  audioVisualizerColor: '#ff6800',
-  audioVisualizerColorDark: '#00ffab',
+  audioVisualizerType: 'wave',
+  audioVisualizerColor: '#002045',
+  audioVisualizerColorDark: '#002045',
   audioVisualizerColorShift: 0.3,
   audioVisualizerBarCount: 5,
   // audioVisualizerType: 'radial',

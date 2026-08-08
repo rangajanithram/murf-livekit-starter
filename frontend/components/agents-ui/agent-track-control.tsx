@@ -165,9 +165,7 @@ function TrackDeviceSelect({
 
   const filteredDevices = useMemo(() => devices.filter((d) => d.deviceId !== ''), [devices]);
 
-  if (filteredDevices.length < 2) {
-    return null;
-  }
+  const hasMultipleDevices = filteredDevices.length >= 2;
 
   return (
     <Select
@@ -175,6 +173,7 @@ function TrackDeviceSelect({
       value={activeDeviceId}
       onOpenChange={handleOpenChange}
       onValueChange={handleActiveDeviceChange}
+      disabled={!hasMultipleDevices}
     >
       <SelectTrigger className={cn(selectVariants({ size, variant }), className)} {...props}>
         {size !== 'sm' && (
@@ -184,7 +183,7 @@ function TrackDeviceSelect({
       <SelectContent position="popper">
         {filteredDevices.map((device) => (
           <SelectItem key={device.deviceId} value={device.deviceId} className="font-mono text-xs">
-            {device.label}
+            {device.label || 'Default Device'}
           </SelectItem>
         ))}
       </SelectContent>

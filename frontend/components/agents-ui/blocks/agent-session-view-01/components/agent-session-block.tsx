@@ -9,6 +9,8 @@ import {
   type AgentControlBarControls,
 } from '@/components/agents-ui/agent-control-bar';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { Track } from 'livekit-client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/shadcn/utils';
 import { TileLayout } from './tile-view';
 
@@ -152,7 +154,7 @@ export interface AgentSessionView_01Props {
   /** Stroke width of the wave path when `audioVisualizerType` is `wave`. */
   audioVisualizerWaveLineWidth?: number;
   /** Optional class name merged onto the outer `<section>` container. */
-  className?: string;
+  language?: 'en' | 'hi';
 }
 
 export function AgentSessionView_01({
@@ -161,6 +163,7 @@ export function AgentSessionView_01({
   supportsVideoInput = true,
   supportsScreenShare = true,
   isPreConnectBufferEnabled = true,
+  language = 'en',
 
   audioVisualizerType,
   audioVisualizerColor,
@@ -177,9 +180,32 @@ export function AgentSessionView_01({
 }: React.ComponentProps<'section'> & AgentSessionView_01Props) {
   const session = useSessionContext();
   const { messages } = useSessionMessages(session);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true); // Advanced Task 1: Show transcript by default
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { state: agentState } = useAgent();
+
+  const getStatusDetails = (state: string) => {
+    switch (state) {
+      case 'listening': 
+        return { text: language === 'hi' ? 'लेक्सी सुन रही है... (Lexi is listening)' : 'Lexi is listening...', icon: 'hearing', color: 'bg-[#f2e580]' };
+      case 'thinking': 
+        return { text: language === 'hi' ? 'लेक्सी सोच रही है... (Lexi is thinking)' : 'Lexi is thinking...', icon: 'psychology', color: 'bg-[#f0f3ff]' };
+      case 'speaking': 
+        return { text: language === 'hi' ? 'लेक्सी बोल रही है... (Lexi is speaking)' : 'Lexi is speaking...', icon: 'record_voice_over', color: 'bg-[#b4f0c9]' };
+      default: return null;
+    }
+  };
+  const status = getStatusDetails(agentState);
+
+  const handleDeviceError = (error: { source: Track.Source; error: Error }) => {
+    if (error.source === Track.Source.Microphone) {
+      toast.error('Microphone Access Denied', {
+        description: 'Please allow microphone access in your browser settings to speak with Lexi.',
+      });
+    } else {
+      toast.error(`Device Error: ${error.error.message}`);
+    }
+  };
 
   const controls: AgentControlBarControls = {
     leave: true,
@@ -201,10 +227,68 @@ export function AgentSessionView_01({
   return (
     <section
       ref={ref}
-      className={cn('bg-background relative z-10 h-full w-full overflow-hidden', className)}
+      className={cn('relative z-10 h-full w-full overflow-hidden', className)}
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
+
+      {/* Decorative Doodles Background for Room */}
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
+        <div className="absolute top-[15%] right-[10%] opacity-20 rotate-12 animate-scribble">
+          <span className="material-symbols-outlined text-[60px] text-[#002045]">menu_book</span>
+        </div>
+        <div className="absolute bottom-[25%] left-[8%] opacity-15 -rotate-12 animate-scribble-slow">
+          <span className="material-symbols-outlined text-[80px] text-[#002045]">school</span>
+        </div>
+        <div className="absolute top-[10%] left-[15%] opacity-10 rotate-45 animate-scribble">
+          <span className="material-symbols-outlined text-[50px] text-[#ba1a1a]">calculate</span>
+        </div>
+        <div className="absolute top-[50%] right-[15%] opacity-10 rotate-[30deg] animate-scribble-slow">
+          <span className="material-symbols-outlined text-[60px] text-[#003f25]">science</span>
+        </div>
+        <div className="absolute top-[40%] left-[5%] opacity-10 rotate-[20deg] animate-scribble">
+          <span className="material-symbols-outlined text-[45px] text-[#ba1a1a]">rocket_launch</span>
+        </div>
+        <div className="absolute bottom-[35%] right-[25%] opacity-10 -rotate-[15deg] animate-scribble-slow">
+          <span className="material-symbols-outlined text-[70px] text-[#002045]">palette</span>
+        </div>
+        <div className="absolute bottom-[10%] left-[30%] opacity-15 rotate-[25deg] animate-scribble">
+          <span className="material-symbols-outlined text-[50px] text-[#003f25]">emoji_objects</span>
+        </div>
+        <div className="absolute top-[30%] right-[2%] opacity-10 -rotate-[10deg] animate-scribble-slow">
+          <span className="material-symbols-outlined text-[55px] text-[#ba1a1a]">history_edu</span>
+        </div>
+        <div className="absolute bottom-[50%] left-[2%] opacity-15 rotate-12 animate-scribble">
+          <span className="material-symbols-outlined text-[65px] text-[#002045]">backpack</span>
+        </div>
+        <div className="absolute top-[5%] right-[30%] opacity-10 -rotate-12 animate-scribble-slow">
+          <span className="material-symbols-outlined text-[65px] text-[#003f25]">straighten</span>
+        </div>
+        <div className="absolute top-[75%] right-[5%] opacity-10 rotate-[45deg] animate-scribble">
+          <span className="material-symbols-outlined text-[50px] text-[#ba1a1a]">functions</span>
+        </div>
+        <div className="absolute bottom-[20%] left-[45%] opacity-15 -rotate-[25deg] animate-scribble-slow">
+          <span className="material-symbols-outlined text-[60px] text-[#002045]">cruelty_free</span>
+        </div>
+      </div>
+
+      {/* Dynamic Status Banner */}
+      <AnimatePresence>
+        {status && (
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex justify-center"
+          >
+            <div className={cn("px-4 py-2 rounded-full border-2 border-[#002045] sketchy-box flex items-center gap-2 shadow-sm transition-colors duration-300", status.color)}>
+               <span className="material-symbols-outlined text-[#002045] animate-pulse">{status.icon}</span>
+               <span className="font-mono font-bold text-[#002045] uppercase tracking-wide text-sm">{status.text}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* transcript */}
 
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">
@@ -260,12 +344,13 @@ export function AgentSessionView_01({
         <div className="bg-background relative mx-auto max-w-2xl pb-3 md:pb-12">
           <Fade bottom className="absolute inset-x-0 top-0 h-4 -translate-y-full" />
           <AgentControlBar
-            variant="livekit"
+            variant="default"
             controls={controls}
             isChatOpen={chatOpen}
             isConnected={session.isConnected}
             onDisconnect={session.end}
             onIsChatOpenChange={setChatOpen}
+            onDeviceError={handleDeviceError}
           />
         </div>
       </motion.div>

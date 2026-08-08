@@ -30,9 +30,9 @@ export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
   <div
     className={cn(
-      'is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm',
-      'group-[.is-user]:bg-secondary group-[.is-user]:text-foreground group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:px-4 group-[.is-user]:py-3',
-      'group-[.is-assistant]:text-foreground',
+      'is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-base leading-relaxed font-mono font-bold tracking-wide',
+      'group-[.is-user]:bg-white group-[.is-user]:border-2 group-[.is-user]:border-[#ba1a1a] group-[.is-user]:text-[#ba1a1a] group-[.is-user]:ml-auto group-[.is-user]:sketchy-box group-[.is-user]:pencil-shadow group-[.is-user]:px-5 group-[.is-user]:py-3 group-[.is-user]:mb-2',
+      'group-[.is-assistant]:bg-white group-[.is-assistant]:border-2 group-[.is-assistant]:border-[#002045] group-[.is-assistant]:text-[#002045] group-[.is-assistant]:sketchy-box group-[.is-assistant]:pencil-shadow group-[.is-assistant]:px-5 group-[.is-assistant]:py-3 group-[.is-assistant]:mb-2',
       className
     )}
     {...props}

@@ -12,16 +12,10 @@ interface ToastProps {
 function toastAlert(toast: ToastProps) {
   const { title, description } = toast;
 
-  return sonnerToast.custom(
-    (id) => (
-      <Alert onClick={() => sonnerToast.dismiss(id)} className="bg-accent w-full md:w-[364px]">
-        <WarningIcon weight="bold" />
-        <AlertTitle>{title}</AlertTitle>
-        {description && <AlertDescription>{description}</AlertDescription>}
-      </Alert>
-    ),
-    { duration: 10_000 }
-  );
+  return sonnerToast.error(title, {
+    description: description,
+    duration: 15_000,
+  });
 }
 
 export function useAgentErrors() {
@@ -33,29 +27,26 @@ export function useAgentErrors() {
       const reasons = agent.failureReasons;
 
       toastAlert({
-        title: 'Session ended',
+        title: 'Connection Failed: Lexi left the room',
         description: (
-          <>
+          <div className="flex flex-col gap-1 mt-2 text-sm">
+            <span className="font-bold uppercase tracking-wide">Why it happened:</span>
             {reasons.length > 1 && (
-              <ul className="list-inside list-disc">
+              <ul className="list-inside list-disc mb-2">
                 {reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
             )}
-            {reasons.length === 1 && <p className="w-full">{reasons[0]}</p>}
-            <p className="w-full">
-              <a
-                target="_blank"
-                rel="noopener noreferrer"
-                href="https://docs.livekit.io/agents/start/voice-ai/"
-                className="whitespace-nowrap underline"
-              >
-                See quickstart guide
-              </a>
-              .
-            </p>
-          </>
+            {reasons.length === 1 && <span className="mb-2">{reasons[0]}</span>}
+            {reasons.length === 0 && <span className="mb-2">The Python backend server is offline or crashed.</span>}
+            
+            <span className="font-bold uppercase tracking-wide mt-1">How to resolve it:</span>
+            <span>1. Open your terminal and check if the backend is running.</span>
+            <span>2. If it stopped, restart it with <code className="bg-black/10 px-1 rounded">uv run python src/agent.py dev</code></span>
+            <span>3. Verify your API keys in the backend <code className="bg-black/10 px-1 rounded">.env.local</code> file.</span>
+            <span>4. Click 'Start Again' below to retry.</span>
+          </div>
         ),
       });
 

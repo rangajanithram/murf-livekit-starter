@@ -117,8 +117,54 @@
 @layer base {
   * {
     @apply border-foreground/20 outline-ring/50;
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  ::-webkit-scrollbar {
+    display: none;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .ruled-bg {
+    background-image: repeating-linear-gradient(transparent, transparent 23px, rgba(0, 32, 69, 0.25) 24px);
+    background-size: 100% 24px;
+  }
+  .sketchy-box {
+    border-radius: 2% 4% 3% 5% / 4% 2% 5% 3%;
+  }
+  .pencil-shadow {
+    box-shadow: 4px 4px 0px 0px rgba(0, 32, 69, 1);
+  }
+  .sketchy-border {
+    border: 2px solid #002045;
+    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  }
+
+  @keyframes scribble {
+    0%, 100% { transform: rotate(-2deg) scale(0.98); }
+    25% { transform: rotate(1deg) scale(1.02); }
+    50% { transform: rotate(-1deg) scale(1); }
+    75% { transform: rotate(2deg) scale(1.01); }
+  }
+
+  .animate-scribble {
+    animation: scribble 0.4s infinite alternate;
+  }
+  .animate-scribble-slow {
+    animation: scribble 1s infinite alternate;
+  }
+
+  .margin-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 20%;
+    width: 2px;
+    background-color: rgba(186, 26, 26, 0.4);
+    z-index: -1;
   }
 }

@@ -108,16 +108,16 @@ function AgentChatInput({ chatOpen, onSend = async () => {}, className }: AgentC
   }, [chatOpen]);
 
   return (
-    <div className={cn('mb-3 flex grow items-end gap-2 rounded-md pl-1 text-sm', className)}>
+    <div className={cn('mb-3 flex grow items-end gap-2 text-sm bg-white border-2 border-[#002045] sketchy-box p-2 text-[#002045] font-mono', className)}>
       <textarea
         autoFocus
         ref={inputRef}
         value={message}
         disabled={!chatOpen || isSending}
-        placeholder="Type something..."
+        placeholder="Write something..."
         onKeyDown={handleKeyDown}
         onChange={(e) => setMessage(e.target.value)}
-        className="field-sizing-content max-h-16 min-h-8 flex-1 resize-none py-2 [scrollbar-width:thin] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="field-sizing-content max-h-16 min-h-8 flex-1 resize-none py-2 px-2 bg-transparent placeholder:text-[#002045]/50 font-mono font-bold [scrollbar-width:thin] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       />
       <Button
         size="icon"
@@ -288,8 +288,7 @@ export function AgentControlBar({
     <div
       aria-label="Voice assistant controls"
       className={cn(
-        'bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/20 flex flex-col p-3 shadow-[0_0_20px_rgba(0,255,171,0.15)] transition-all duration-300',
-        variant === 'livekit' ? 'rounded-[31px]' : 'rounded-2xl',
+        'bg-[#ffffff] border-2 border-[#002045] flex flex-col p-4 sm:p-5 gap-2 sketchy-box pencil-shadow transition-all duration-500 z-50',
         className
       )}
       {...props}
@@ -392,8 +391,7 @@ export function AgentControlBar({
             onClick={onDisconnect}
             disabled={!isConnected}
             className={cn(
-              variant === 'livekit' &&
-                'bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-500 hover:bg-red-500/30 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] focus-visible:ring-red-500/20 rounded-full font-mono text-xs font-bold tracking-wider transition-all duration-300'
+              'px-6 py-3 bg-white border-2 border-[#ba1a1a] text-[#ba1a1a] hover:bg-[#ffdad6] sketchy-box pencil-shadow focus-visible:ring-red-500/20 font-mono text-sm font-bold tracking-wider hover:scale-105 active:scale-95 transition-all duration-300'
             )}
           >
             <span className="hidden md:inline">END CALL</span>

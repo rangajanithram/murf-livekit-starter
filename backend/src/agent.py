@@ -26,7 +26,11 @@ IDENTITY: You are Lexi, a friendly, patient, and encouraging English language tu
 OBJECTIVES: 
 Help children practice basic spoken English in a stress-free environment. Build their confidence by giving positive reinforcement. Keep them engaged by asking simple, relatable questions about their day or surroundings.
 
-KNOWLEDGE: You know basic English grammar, vocabulary, and conversational phrasing suitable for beginners. You do not know advanced pedagogy, medical psychology, or complex academic subjects.
+KNOWLEDGE & LOGIC: You have basic human common sense. You know basic English grammar, vocabulary, and conversational phrasing suitable for beginners. You do not know advanced pedagogy, medical psychology, or complex academic subjects.
+
+COMPREHENSION & NOISE HANDLING:
+Before responding, critically evaluate if the user's input makes any sense. If the user types or speaks random letters, keyboard smashes, complete gibberish (like "jwkbff", "fnofb", "asdfg"), or incomprehensible background noise, DO NOT try to answer it as if it were a normal sentence. DO NOT hallucinate a meaning.
+Instead, gently say you didn't catch that, or ask them if they need help typing/speaking. For example: "I didn't quite catch that. Could you say it again?" or "Hmm, that didn't sound like a word. Want to try again?"
 
 LANGUAGE: Use simple, clear, and warm language. You must seamlessly handle code-mixing. If the user speaks in Hindi or a mix of Hindi and English, you should understand them and reply in a supportive mix of Hindi and English, matching their register and formality. Keep it casual and encouraging.
 
@@ -35,6 +39,7 @@ Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that 
 
 STYLE:
 Keep your answers extremely short, ideally just one or two simple sentences under 20 words. Speak at a relaxed, patient pace. Do not use any bullet points, asterisks, brackets, emojis, or formatting meant for a screen. 
+When the user speaks Hindi, you MUST reply with a mix of Hindi and English (Hinglish), using the English alphabet (romanized text). For example: "Haan, main samajh sakti hoon. Let's practice verbs today."
 """
 
 
@@ -60,7 +65,7 @@ class Assistant(Agent):
     #     return "sunny with a temperature of 70 degrees."
 
 
-server = AgentServer(load_threshold=10.0)
+server = AgentServer(load_threshold=10.0, num_idle_processes=1)
 
 
 def prewarm(proc: JobProcess):
@@ -82,7 +87,7 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3", language="hi"),
+        stt=deepgram.STT(model="nova-3", language="multi"),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
@@ -92,9 +97,9 @@ async def my_agent(ctx: JobContext):
         # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
                 voice="Anisha", 
-                locale="en-IN",
                 style="Conversation",
-                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                min_buffer_size=1,
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=1),
                 text_pacing=True
             ),
         # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
@@ -142,24 +147,37 @@ async def my_agent(ctx: JobContext):
 
     import asyncio
 
+    import time
     async def silent_user_handler():
+        last_activity = time.time()
         silence_count = 0
+        
         while True:
-            await asyncio.sleep(15)
-            # If the agent is currently idle or listening, it implies the user hasn't spoken and the agent isn't replying
-            current_state = str(session.agent_state).lower()
-            if current_state.endswith("idle") or current_state.endswith("listening"):
-                silence_count += 1
-                if silence_count == 1:
-                    await session.say("Are you still there? Tell me one English word you learned today.", allow_interruptions=True)
-                elif silence_count >= 2:
-                    await session.say("It looks like you stepped away. Let's practice later. Goodbye!", allow_interruptions=False)
-                    await asyncio.sleep(3)
-                    await ctx.room.disconnect()
-                    break
-            else:
-                # Reset if the user started speaking or the agent is doing something
+            await asyncio.sleep(5)
+            
+            agent_s = str(session.agent_state).lower()
+            try:
+                user_s = str(session.user_state).lower()
+            except Exception:
+                user_s = "unknown"
+                
+            # If agent is generating/speaking, or if user is currently speaking, reset the timer
+            if not agent_s.endswith("listening") or user_s.endswith("speaking"):
+                last_activity = time.time()
                 silence_count = 0
+                continue
+                
+            elapsed = time.time() - last_activity
+            
+            if elapsed > 45 and silence_count == 0:
+                silence_count = 1
+                await session.say("Are you still there? Tell me one English word you learned today.", allow_interruptions=True)
+            elif elapsed > 75 and silence_count == 1:
+                silence_count = 2
+                await session.say("It looks like you stepped away. Let's practice later. Goodbye!", allow_interruptions=False)
+                await asyncio.sleep(3)
+                await ctx.room.disconnect()
+                break
 
     # Join the room and connect to the user
     await ctx.connect()

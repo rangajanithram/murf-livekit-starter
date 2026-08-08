@@ -3,6 +3,8 @@ import localFont from 'next/font/local';
 import { headers } from 'next/headers';
 import { ThemeProvider } from '@/components/app/theme-provider';
 import { ThemeToggle } from '@/components/app/theme-toggle';
+import { PencilCursor } from '@/components/app/pencil-cursor';
+import MagicCursor from '@/components/ui/magic-cursor';
 import { cn } from '@/lib/shadcn/utils';
 import { getAppConfig, getStyles } from '@/lib/utils';
 import '@/styles/globals.css';
@@ -63,20 +65,19 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         {styles && <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: styles }} />}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&display=swap" rel="stylesheet"/>
       </head>
-      <body className="overflow-x-hidden">
+      <body className="bg-[#f9f9ff] ruled-bg overflow-x-hidden">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          forcedTheme="light"
           disableTransitionOnChange
         >
-
-
+          <MagicCursor fillColor="#002045" enableGlow={false} cursorSize={30} labelText="" />
+          <PencilCursor />
           {children}
-          <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">
-            <ThemeToggle className="translate-y-20 transition-transform delay-150 duration-300 group-hover:translate-y-0" />
-          </div>
         </ThemeProvider>
       </body>
     </html>

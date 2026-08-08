@@ -325,11 +325,12 @@ function __OriginkitBase_MeshText(props: any) {
             const w = Math.max(2, canvas.width)
             const h = Math.max(2, canvas.height)
             const dpr = window.devicePixelRatio || 1
-            const realSize = fontSize * dpr
-            // Wait for the requested font to be ready. Use both .load and
-            // .ready so we cover Framer's async font injection — without
-            // this canvas 2D silently falls back to system font, which is
-            // why "font modal doesn't work" symptoms appear.
+            
+            // Make font size responsive to container width (assume text needs ~5x font size in width)
+            const maxFontSizeForWidth = w / dpr / 4.5;
+            const effectiveFontSize = Math.min(toNum(fontSize, 180), maxFontSizeForWidth);
+            const realSize = effectiveFontSize * dpr;
+
             try {
                 if (typeof document !== "undefined") {
                     const fontStr = `${fontStyle} ${fontWeight} ${realSize}px ${fontFamily}`

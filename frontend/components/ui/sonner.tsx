@@ -32,6 +32,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--border-radius': 'var(--radius)',
         } as React.CSSProperties
       }
+      toastOptions={{
+        classNames: {
+          toast: 'font-mono sketchy-box pencil-shadow border-2',
+          title: 'font-bold tracking-wide text-sm',
+          description: 'text-xs mt-1',
+          error: 'bg-[#fff0f0] border-[#ba1a1a] text-[#ba1a1a]',
+          success: 'bg-[#e2f5ea] border-[#003f25] text-[#003f25]',
+          warning: 'bg-[#fff8e1] border-[#f2e580] text-[#002045]',
+          info: 'bg-[#f0f3ff] border-[#002045] text-[#002045]',
+        }
+      }}
       {...props}
     />
   );
