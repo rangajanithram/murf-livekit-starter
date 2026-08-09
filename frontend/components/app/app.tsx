@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { TokenSource } from 'livekit-client';
 import { useSession } from '@livekit/components-react';
 import { WarningIcon } from '@phosphor-icons/react/dist/ssr';
@@ -8,6 +8,7 @@ import type { AppConfig } from '@/app-config';
 import { AgentSessionProvider } from '@/components/agents-ui/agent-session-provider';
 import { StartAudioButton } from '@/components/agents-ui/start-audio-button';
 import { ViewController } from '@/components/app/view-controller';
+import { SettingsPanel } from '@/components/app/settings-panel';
 import { Toaster } from '@/components/ui/sonner';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
@@ -27,6 +28,9 @@ interface AppProps {
 }
 
 export function App({ appConfig }: AppProps) {
+  const [uiSize, setUiSize] = React.useState<'normal' | 'large'>('large');
+  const [volume, setVolume] = React.useState<number>(1.0);
+
   const tokenSource = useMemo(() => {
     return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
       ? getSandboxTokenSource(appConfig)
@@ -39,11 +43,17 @@ export function App({ appConfig }: AppProps) {
   );
 
   return (
-    <AgentSessionProvider session={session}>
+    <AgentSessionProvider session={session} volume={volume}>
       <AppSetup />
-      <main className="grid h-svh grid-cols-1 place-content-center">
-        <ViewController appConfig={appConfig} />
-      </main>
+      <SettingsPanel uiSize={uiSize} setUiSize={setUiSize} volume={volume} setVolume={setVolume} />
+      <div 
+        className="w-full h-full" 
+        style={{ zoom: uiSize === 'large' ? 1.25 : 1 }}
+      >
+        <main className="grid h-svh grid-cols-1 place-content-center">
+          <ViewController appConfig={appConfig} />
+        </main>
+      </div>
       <StartAudioButton label="Start Audio" />
       <Toaster
         icons={{

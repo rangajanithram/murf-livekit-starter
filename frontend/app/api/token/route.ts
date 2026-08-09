@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-server-sdk';
 import { RoomConfiguration } from '@livekit/protocol';
 
@@ -45,9 +46,17 @@ export async function POST(req: Request) {
     }
       
     // Generate participant token
+    const cookieStore = await cookies();
+    let deviceId = cookieStore.get('device_id')?.value;
+    let isNewDevice = false;
+    if (!deviceId) {
+      deviceId = `user_${Math.floor(Math.random() * 10_000)}`;
+      isNewDevice = true;
+    }
+
     const participantName = 'user';
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
-    const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+    const participantIdentity = deviceId;
+    const roomName = `room_${deviceId}_${Math.floor(Math.random() * 10000)}`;
 
     const participantToken = await createParticipantToken(
       { identity: participantIdentity, name: participantName },
@@ -65,7 +74,12 @@ export async function POST(req: Request) {
     const headers = new Headers({
       'Cache-Control': 'no-store',
     });
-    return NextResponse.json(data, { headers });
+    
+    const response = NextResponse.json(data, { headers });
+    if (isNewDevice) {
+      response.cookies.set('device_id', deviceId, { maxAge: 60 * 60 * 24 * 365 });
+    }
+    return response;
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);

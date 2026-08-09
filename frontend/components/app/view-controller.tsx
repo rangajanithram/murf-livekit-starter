@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
-import { useSessionContext, useConnectionState } from '@livekit/components-react';
+import { useSessionContext, useConnectionState, useAgent } from '@livekit/components-react';
 import { ConnectionState } from 'livekit-client';
 import { toast } from 'sonner';
 import type { AppConfig } from '@/app-config';
@@ -40,6 +40,7 @@ interface ViewControllerProps {
 export function ViewController({ appConfig }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const connectionState = useConnectionState();
+  const agent = useAgent();
   const { resolvedTheme } = useTheme();
   const [hasConnected, setHasConnected] = useState(false);
   const [isAppLoaded, setIsAppLoaded] = useState(false);
@@ -99,11 +100,11 @@ export function ViewController({ appConfig }: ViewControllerProps) {
         />
       )}
       {/* Connecting view */}
-      {connectionState === ConnectionState.Connecting && (
+      {(connectionState === ConnectionState.Connecting || (isConnected && (!agent?.state || ['disconnected', 'connecting', 'initializing'].includes(agent.state)))) && (
         <motion.div
           key="connecting"
           {...VIEW_MOTION_PROPS}
-          className="fixed inset-0 flex flex-col items-center justify-center z-[100]"
+          className="fixed inset-0 flex flex-col items-center justify-center z-[100] bg-white/80 backdrop-blur-sm"
         >
           <div className="flex flex-col items-center gap-6">
             <div className="relative w-24 h-24 flex items-center justify-center">
@@ -123,7 +124,7 @@ export function ViewController({ appConfig }: ViewControllerProps) {
         </motion.div>
       )}
       {/* Session view */}
-      {isConnected && (
+      {isConnected && agent?.state && !['disconnected', 'connecting', 'initializing'].includes(agent.state) && (
         <MotionSessionView
           key="session-view"
           {...VIEW_MOTION_PROPS}
