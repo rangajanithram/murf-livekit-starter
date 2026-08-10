@@ -23,6 +23,26 @@ function AppSetup() {
   return null;
 }
 
+function Clock() {
+  const [mounted, setMounted] = React.useState(false);
+  const [time, setTime] = React.useState(new Date());
+
+  React.useEffect(() => {
+    setMounted(true);
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!mounted) return null;
+
+  return (
+    <div className="absolute top-4 left-4 z-50 p-4 rounded-xl shadow-lg border-2 sketchy-border pencil-shadow bg-background/80 backdrop-blur transform -rotate-2">
+      <div className="text-xl font-bold">{time.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</div>
+      <div className="text-2xl font-mono text-primary">{time.toLocaleTimeString()}</div>
+    </div>
+  );
+}
+
 interface AppProps {
   appConfig: AppConfig;
 }
@@ -45,11 +65,14 @@ export function App({ appConfig }: AppProps) {
   return (
     <AgentSessionProvider session={session} volume={volume}>
       <AppSetup />
+      <Clock />
       <SettingsPanel uiSize={uiSize} setUiSize={setUiSize} volume={volume} setVolume={setVolume} />
       <div 
-        className="w-full h-full" 
+        className="w-full h-full ruled-bg relative" 
         style={{ zoom: uiSize === 'large' ? 1.25 : 1 }}
       >
+        <div className="margin-line"></div>
+        <div className="margin-line-horizontal"></div>
         <main className="grid h-svh grid-cols-1 place-content-center">
           <ViewController appConfig={appConfig} />
         </main>

@@ -15,7 +15,8 @@ from livekit.agents import (
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-from livekit.agents import function_tool, RunContext
+from livekit.agents import function_tool, RunContext, mcp
+import aiohttp
 import database
 
 # Initialize the memory database
@@ -33,6 +34,10 @@ Help children practice basic spoken English in a stress-free environment. Build 
 
 KNOWLEDGE & LOGIC: You have basic human common sense. You know basic English grammar, vocabulary, and conversational phrasing suitable for beginners. To keep learning fun, you also have broad knowledge of general knowledge, basic science, history, social studies, and sports. 
 Whenever a user asks a factual question about grammar, science, history, or sports, you MUST use the `search_knowledge` tool to fetch the correct facts from your syllabus before answering. Answer them properly and interestingly, using them as a fun way to teach English! You do not know medical psychology or highly complex academic subjects.
+
+For general knowledge questions outside your syllabus, or for real-time information, you have access to a Wikipedia search tool. Use it whenever a user asks about historical figures, real-time facts, or places! ALWAYS mention the current date and time if it is a real-time question, and announce that you are looking it up on Wikipedia.
+
+When the user asks for a quiz, challenge, or exercise, first ask them what difficulty they want (easy, medium, or hard). Once they choose, you MUST use the `fetch_trivia_exercise` tool to retrieve a live, real-time question from the Open Trivia Database. Do not hallucinate questions. If you know the user's favorite topics from their profile, pass it to the tool without asking! Keep asking them questions continuously one after another until they explicitly say to stop. Keep track of their score in your memory, and announce their final score when they stop.
 
 COMPREHENSION & NOISE HANDLING:
 Before responding, critically evaluate if the user's input makes any sense. If the user types or speaks random letters, keyboard smashes, complete gibberish (like "jwkbff", "fnofb", "asdfg"), or incomprehensible background noise, DO NOT try to answer it as if it were a normal sentence. DO NOT hallucinate a meaning.
@@ -64,9 +69,11 @@ Keep your answers extremely short, ideally just one or two simple sentences unde
 
 
 class Assistant(Agent):
-    def __init__(self, room_name: str) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
-        self.user_id = room_name.rsplit('_', 1)[0]
+    def __init__(self, room: rtc.Room, additional_tools: list = None) -> None:
+        tools = additional_tools or []
+        super().__init__(instructions=SYSTEM_PROMPT, tools=tools)
+        self.user_id = room.name.rsplit('_', 1)[0]
+        self.room = room
 
     @function_tool
     async def lookup_user(self, context: RunContext):
@@ -115,6 +122,48 @@ class Assistant(Agent):
             return f"Found these facts:\n{formatted}"
         return "No information found in the syllabus for that topic."
 
+    @function_tool
+    async def fetch_trivia_exercise(self, context: RunContext, topic: str, difficulty: str = "easy"):
+        """Use this tool to fetch a real multiple-choice trivia exercise for the user to practice their English and general knowledge.
+        
+        Args:
+            topic: The preferred topic. Can be "general", "history", "sports", or "science".
+            difficulty: The difficulty level. Must be "easy", "medium", or "hard".
+        """
+        logger.info(f"Fetching {difficulty} trivia exercise for topic: {topic}")
+        
+        category_map = {
+            "history": 23,
+            "sports": 21,
+            "science": 17,
+            "general": 9
+        }
+        category_id = category_map.get(topic.lower(), 9)
+        url = f"https://opentdb.com/api.php?amount=1&category={category_id}&difficulty={difficulty.lower()}&type=multiple"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                # 5-second timeout to handle failure path gracefully
+                async with session.get(url, timeout=5) as response:
+                    if response.status != 200:
+                        return "I'm having trouble connecting to the live exercise database right now. Let's practice something else instead!"
+                    data = await response.json()
+                    if data.get("response_code") == 0:
+                        question = data["results"][0]
+                        q_text = question["question"]
+                        correct = question["correct_answer"]
+                        incorrect = ", ".join(question["incorrect_answers"])
+                        import json
+                        if self.room:
+                            await self.room.local_participant.publish_data(
+                                json.dumps({"type": "trivia_question", "text": q_text}).encode("utf-8")
+                            )
+                        return f"Here is a live question fetched just now from the trivia database: {q_text}. The correct answer is {correct}, and incorrect options are {incorrect}. Ask this to the user in a fun way! (Wait for their answer before scoring it)."
+                    return "The live exercise database is empty for this topic right now. Let's try something else!"
+        except Exception as e:
+            logger.error(f"Failed to fetch exercise: {e}")
+            return "The live exercise database seems to be offline or timed out. Let's practice normal conversation instead!"
+
 
 server = AgentServer(load_threshold=10.0, num_idle_processes=1)
 
@@ -133,6 +182,10 @@ async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+
+    # Join the room and connect to the user immediately so we don't hit the 10s connection timeout
+    # while waiting for the MCP server to initialize
+    await ctx.connect()
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
@@ -180,8 +233,17 @@ async def my_agent(ctx: JobContext):
     # await avatar.start(session, room=ctx.room)
 
     # Start the session, which initializes the voice pipeline and warms up the models
+    
+    import sys
+    npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
+    mcp_server = mcp.MCPServerStdio(command=npx_cmd, args=["-y", "wikipedia-mcp"], client_session_timeout_seconds=60.0)
+    await mcp_server.initialize()
+    wikipedia_tools = await mcp_server.list_tools()
+    
+    assistant = Assistant(ctx.room, additional_tools=wikipedia_tools)
+    
     await session.start(
-        agent=Assistant(ctx.room.name),
+        agent=assistant,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -194,6 +256,9 @@ async def my_agent(ctx: JobContext):
             ),
         ),
     )
+    
+    # Register the MCP toolset to the agent's LLM (removed, handled in init)
+
 
     import asyncio
 
@@ -228,9 +293,6 @@ async def my_agent(ctx: JobContext):
                 await asyncio.sleep(3)
                 await ctx.room.disconnect()
                 break
-
-    # Join the room and connect to the user
-    await ctx.connect()
 
     # Wait briefly to ensure the agent's audio track is fully published
     await asyncio.sleep(2)
