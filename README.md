@@ -16,6 +16,14 @@ Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on th
 
 ---
 
+## Data Sources (Day 5)
+
+This agent uses **live** real-time data from two distinct sources:
+1. **Open Trivia Database API**: Fetches real-time, randomized trivia questions based on the user's difficulty and topic preferences.
+2. **Wikipedia MCP Server**: Fetches real-time facts and the current date/time directly from Wikipedia via the Model Context Protocol.
+
+---
+
 ## Architecture
 
 ```mermaid
