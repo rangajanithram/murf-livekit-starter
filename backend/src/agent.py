@@ -235,13 +235,28 @@ async def my_agent(ctx: JobContext):
     # Start the session, which initializes the voice pipeline and warms up the models
     
     import sys
-    npx_cmd = "npx.cmd" if sys.platform == "win32" else "npx"
-    mcp_server = mcp.MCPServerStdio(command=npx_cmd, args=["-y", "wikipedia-mcp"], client_session_timeout_seconds=60.0)
-    await mcp_server.initialize()
-    wikipedia_tools = await mcp_server.list_tools()
+    import asyncio
+    cmd = "wikipedia-mcp.cmd" if sys.platform == "win32" else "wikipedia-mcp"
+    mcp_server = mcp.MCPServerStdio(command=cmd, args=[], client_session_timeout_seconds=60.0)
     
-    assistant = Assistant(ctx.room, additional_tools=wikipedia_tools)
+    assistant = Assistant(ctx.room, additional_tools=[])
     
+    async def load_mcp():
+        try:
+            logger.info("Initializing MCP server in background...")
+            await mcp_server.initialize()
+            wikipedia_tools = await mcp_server.list_tools()
+            logger.info(f"Loaded {len(wikipedia_tools)} Wikipedia tools.")
+            if hasattr(assistant, "update_tools"):
+                new_tools = list(assistant.tools) + wikipedia_tools
+                assistant.update_tools(new_tools)
+            else:
+                logger.error("assistant.update_tools not found, cannot add MCP tools!")
+        except Exception as e:
+            logger.error(f"Failed to load MCP tools: {e}")
+            
+    asyncio.create_task(load_mcp())
+
     await session.start(
         agent=assistant,
         room=ctx.room,
