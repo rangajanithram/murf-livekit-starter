@@ -61,7 +61,7 @@ export function App({ appConfig }: AppProps) {
     tokenSource,
     {
       agentName: appConfig.agentName ? appConfig.agentName : undefined,
-      agentConnectTimeoutMilliseconds: 30000,
+      agentConnectTimeoutMilliseconds: 120000,
     }
   );
 
