@@ -249,7 +249,7 @@ async def my_agent(ctx: JobContext):
             logger.info(f"Loaded {len(wikipedia_tools)} Wikipedia tools.")
             if hasattr(assistant, "update_tools"):
                 new_tools = list(assistant.tools) + wikipedia_tools
-                assistant.update_tools(new_tools)
+                await assistant.update_tools(new_tools)
             else:
                 logger.error("assistant.update_tools not found, cannot add MCP tools!")
         except Exception as e:
