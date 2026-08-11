@@ -109,6 +109,15 @@ class Assistant(Agent):
         return "Profile not found."
 
     @function_tool
+    async def cancel_subscription(self, context: RunContext):
+        """Use this tool to cancel the user's daily practice subscription and end the call immediately."""
+        logger.info("Canceling subscription and ending call.")
+        import asyncio
+        if self.room:
+            asyncio.create_task(self.room.disconnect())
+        return "Subscription canceled. The call is now ending."
+
+    @function_tool
     async def search_knowledge(self, context: RunContext, query: str):
         """Use this tool to search the syllabus knowledge base for facts about grammar, history, science, or sports.
         
@@ -312,14 +321,20 @@ async def my_agent(ctx: JobContext):
     # Wait briefly to ensure the agent's audio track is fully published
     await asyncio.sleep(2)
 
-    # Check if returning user
-    user_id = ctx.room.name.rsplit('_', 1)[0]
-    user = database.get_user(user_id)
-    if user:
-        await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
+    is_outbound = ctx.room.name.startswith("practice-call-")
+
+    if is_outbound:
+        # Day 6 Outbound Greeting: Who's calling, why, and how to stop.
+        await session.say("Hello! This is Lexi from your Daily Practice program calling for your scheduled English lesson. If you'd like me to stop calling, just say 'cancel my subscription'. Are you ready to begin?", allow_interruptions=True)
     else:
-        # Initial greeting
-        await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
+        # Check if returning user
+        user_id = ctx.room.name.rsplit('_', 1)[0]
+        user = database.get_user(user_id)
+        if user:
+            await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
+        else:
+            # Initial greeting
+            await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
 
     # Start the silence timeout handler ONLY AFTER the agent is connected and has greeted
     asyncio.create_task(silent_user_handler())
