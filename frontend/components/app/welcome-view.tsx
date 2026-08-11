@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import MeshText from '@/components/ui/mesh-text';
+import { useState } from 'react';
 
 interface WelcomeViewProps {
   onStartCall: () => void;
@@ -30,6 +31,35 @@ export const WelcomeView = ({
   };
 
   const t = translations[language];
+  const [phone, setPhone] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
+  const [callStatus, setCallStatus] = useState('');
+
+  const displayPhone = !isFocused && phone.length >= 4 
+    ? 'x'.repeat(phone.length - 4) + phone.slice(-4) 
+    : phone;
+
+  const handleCallMe = async () => {
+    if (!phone) return;
+    setIsCalling(true);
+    setCallStatus('Calling...');
+    try {
+      const res = await fetch('/api/outbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      if (res.ok) {
+        setCallStatus('Phone ringing! Answer it to talk to Lexi.');
+      } else {
+        setCallStatus('Failed to initiate call.');
+      }
+    } catch (e) {
+      setCallStatus('Error initiating call.');
+    }
+    setIsCalling(false);
+  };
 
   return (
     <div ref={ref} className="relative w-full h-full min-h-screen overflow-hidden flex flex-col items-center justify-center text-center px-4">
@@ -72,6 +102,37 @@ export const WelcomeView = ({
           <span className="material-symbols-outlined text-2xl sm:text-3xl group-hover:rotate-12 transition-transform">edit</span>
           {isReconnect && language === 'en' ? 'Start Again' : isReconnect && language === 'hi' ? 'फिर से शुरू करें' : t.start}
         </Button>
+
+        {/* Call Me Feature */}
+        <div className="mt-8 flex flex-col items-center gap-3 z-50 w-full max-w-[320px] p-4 bg-white/70 backdrop-blur-md rounded-xl border-2 border-[#002045] sketchy-box shadow-md pointer-events-auto">
+          <p className="font-mono text-sm font-bold text-[#002045]">Or get a phone call from Lexi!</p>
+          <input
+            type={isFocused ? "tel" : "text"}
+            placeholder="e.g. +919353143053"
+            value={displayPhone}
+            onChange={(e) => {
+              // Only update if they are actively typing (focused).
+              // If not focused, ignore the change to prevent masking issues.
+              if (isFocused) {
+                setPhone(e.target.value);
+              }
+            }}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            className="w-full px-3 py-2 border-2 border-[#002045] rounded-md font-mono text-sm focus:outline-none focus:bg-[#f2e580]/30"
+          />
+          <Button
+            size="sm"
+            onClick={handleCallMe}
+            disabled={isCalling || !phone}
+            className="w-full bg-[#002045] text-white hover:bg-[#1a365d] border-2 border-transparent hover:border-[#f2e580] font-mono text-sm font-bold transition-all disabled:opacity-50"
+          >
+            {isCalling ? 'Dialing...' : 'Call Me'}
+          </Button>
+          {callStatus && (
+            <p className="font-mono text-xs text-[#ba1a1a] font-bold mt-1 animate-pulse">{callStatus}</p>
+          )}
+        </div>
       </section>
 
       {/* Decorative Doodles */}

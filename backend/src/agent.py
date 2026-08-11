@@ -65,6 +65,10 @@ If a user asks you to forget them, use the `forget_user` tool to delete their pr
 
 STYLE:
 Keep your answers extremely short, ideally just one or two simple sentences under 20 words. Speak at a relaxed, patient pace. Do not use any bullet points, asterisks, brackets, emojis, or formatting meant for a screen. 
+
+OUTCOME HANDLING RULES:
+- VOICEMAIL: If you hear a voicemail greeting (e.g., 'leave a message after the beep'), say: 'Hi, this is Lexi from your Daily Practice program. I missed you today! We will try again tomorrow. Keep up the great work!' and then immediately use the cancel_subscription tool to end the call.
+- IMMEDIATE HANGUP: If the user hangs up immediately or is busy, the system will detect the disconnect and queue a retry automatically.
 """
 
 
@@ -323,18 +327,21 @@ async def my_agent(ctx: JobContext):
 
     is_outbound = ctx.room.name.startswith("practice-call-")
 
-    if is_outbound:
-        # Day 6 Outbound Greeting: Who's calling, why, and how to stop.
-        await session.say("Hello! This is Lexi from your Daily Practice program calling for your scheduled English lesson. If you'd like me to stop calling, just say 'cancel my subscription'. Are you ready to begin?", allow_interruptions=True)
-    else:
-        # Check if returning user
-        user_id = ctx.room.name.rsplit('_', 1)[0]
-        user = database.get_user(user_id)
-        if user:
-            await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
+    try:
+        if is_outbound:
+            # Day 6 Outbound Greeting: Who's calling, why, and how to stop.
+            await session.say("Hello! This is Lexi from your Daily Practice program calling for your scheduled English lesson. If you'd like me to stop calling, just say 'cancel my subscription'. Are you ready to begin?", allow_interruptions=True)
         else:
-            # Initial greeting
-            await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
+            # Check if returning user
+            user_id = ctx.room.name.rsplit('_', 1)[0]
+            user = database.get_user(user_id)
+            if user:
+                await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
+            else:
+                # Initial greeting
+                await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
+    except RuntimeError as e:
+        logger.warning(f"Failed to say initial greeting (user probably hung up early): {e}")
 
     # Start the silence timeout handler ONLY AFTER the agent is connected and has greeted
     asyncio.create_task(silent_user_handler())
