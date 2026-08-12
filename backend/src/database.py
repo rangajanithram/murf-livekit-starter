@@ -6,7 +6,7 @@ import json
 
 logger = logging.getLogger("database")
 
-DB_FILE = "lexi_memory.db"
+DB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lexi_memory.db")
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -20,6 +20,21 @@ def init_db():
             topics_covered TEXT,
             mistakes TEXT,
             last_interaction DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create escalations table for Day 7 Hand-off
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS escalations (
+            escalation_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            summary TEXT,
+            urgency TEXT,
+            language TEXT,
+            follow_up_method TEXT,
+            phone_number TEXT,
+            status TEXT DEFAULT 'OPEN',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -111,4 +126,69 @@ def search_knowledge(query: str):
         
     conn.close()
     return results
+
+def save_escalation(user_id: str, summary: str, urgency: str, language: str, follow_up_method: str, phone_number: str = None):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Advanced feature: Stop duplicate requests. Check if an OPEN request exists for this user.
+    c.execute("SELECT escalation_id, summary FROM escalations WHERE user_id = ? AND status = 'OPEN'", (user_id.lower(),))
+    existing = c.fetchone()
+    
+    if existing:
+        esc_id = existing[0]
+        # Append new summary to existing
+        new_summary = f"{existing[1]}\n[UPDATE]: {summary}"
+        c.execute('''
+            UPDATE escalations 
+            SET summary = ?, urgency = ?, language = ?, follow_up_method = ?, phone_number = ?, created_at = CURRENT_TIMESTAMP
+            WHERE escalation_id = ?
+        ''', (new_summary, urgency, language, follow_up_method, phone_number, esc_id))
+        conn.commit()
+        conn.close()
+        logger.info(f"Updated existing escalation {esc_id} for user: {user_id}")
+        return esc_id
+    else:
+        # Create new request
+        import uuid
+        # Generate a short friendly ID like REQ-8A4F
+        esc_id = f"REQ-{uuid.uuid4().hex[:4].upper()}"
+        
+        c.execute('''
+            INSERT INTO escalations (escalation_id, user_id, summary, urgency, language, follow_up_method, phone_number, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN')
+        ''', (esc_id, user_id.lower(), summary, urgency, language, follow_up_method, phone_number))
+        conn.commit()
+        conn.close()
+        logger.info(f"Created new escalation {esc_id} for user: {user_id}")
+        return esc_id
+
+def get_escalations():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM escalations ORDER BY created_at DESC")
+    results = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return results
+
+def get_escalation_status(esc_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT status FROM escalations WHERE escalation_id = ?", (esc_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return row['status']
+    return "Not Found"
+
+def resolve_escalation(esc_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE escalations SET status = 'RESOLVED' WHERE escalation_id = ?", (esc_id,))
+    conn.commit()
+    conn.close()
+    return True
+
 

@@ -65,15 +65,24 @@ export function App({ appConfig }: AppProps) {
     }
   );
 
+  React.useEffect(() => {
+    if (uiSize === 'large') {
+      document.documentElement.style.fontSize = '120%'; // Scales 1rem = 19.2px
+    } else {
+      document.documentElement.style.fontSize = '100%'; // Scales 1rem = 16px
+    }
+    // Cleanup on unmount just in case
+    return () => {
+      document.documentElement.style.fontSize = '100%';
+    };
+  }, [uiSize]);
+
   return (
     <AgentSessionProvider session={session} volume={volume}>
       <AppSetup />
       <Clock />
       <SettingsPanel uiSize={uiSize} setUiSize={setUiSize} volume={volume} setVolume={setVolume} />
-      <div 
-        className="w-full h-full ruled-bg relative" 
-        style={{ zoom: uiSize === 'large' ? 1.25 : 1 }}
-      >
+      <div className="w-full h-full ruled-bg relative">
         <div className="margin-line"></div>
         <div className="margin-line-horizontal"></div>
         <main className="grid h-svh grid-cols-1 place-content-center">

@@ -63,20 +63,33 @@ export const WelcomeView = ({
 
   return (
     <div ref={ref} className="relative w-full h-full min-h-screen overflow-hidden flex flex-col items-center justify-center text-center px-4">
-      {/* Language Toggle */}
-      <div className="absolute top-6 right-6 z-50 flex gap-2">
-        <button 
-          onClick={() => onLanguageChange('en')}
-          className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'en' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
+      {/* Top Right Controls */}
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-4">
+        {/* Teacher Dashboard Link */}
+        <a 
+          href="/escalations" 
+          target="_blank"
+          className="px-4 py-2 font-mono text-sm font-bold border-2 sketchy-box transition-all bg-white text-[#ba1a1a] border-[#ba1a1a] hover:bg-[#ba1a1a] hover:text-white flex items-center gap-2"
         >
-          EN
-        </button>
-        <button 
-          onClick={() => onLanguageChange('hi')}
-          className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'hi' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
-        >
-          HI
-        </button>
+          <span className="material-symbols-outlined text-sm">support_agent</span>
+          Teacher Dashboard
+        </a>
+
+        {/* Language Toggle */}
+        <div className="flex gap-2">
+          <button 
+            onClick={() => onLanguageChange('en')}
+            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'en' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
+          >
+            EN
+          </button>
+          <button 
+            onClick={() => onLanguageChange('hi')}
+            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'hi' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
+          >
+            HI
+          </button>
+        </div>
       </div>
 
       <section className="relative z-10 flex flex-col items-center justify-center w-full px-4">

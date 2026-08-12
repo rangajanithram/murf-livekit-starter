@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import argparse
+import subprocess
 from dotenv import load_dotenv
 from livekit import api
 from livekit.protocol import agent_dispatch as ad_proto
@@ -11,6 +12,7 @@ load_dotenv(".env.local")
 async def main():
     parser = argparse.ArgumentParser(description="Trigger an outbound call via LiveKit SIP")
     parser.add_argument("--phone", required=True, help="Phone number to call (e.g. +919353143053)")
+    parser.add_argument("--attempt", type=int, default=1, help="Attempt number for the call")
     args = parser.parse_args()
 
     # Load credentials
@@ -26,7 +28,9 @@ async def main():
     print(f"Connecting to LiveKit... (Trunk: {trunk_id})")
     lk = api.LiveKitAPI(url, api_key, api_secret)
     
-    room_name = f"practice-call-{os.urandom(4).hex()}"
+    # Append the phone number and attempt to the room name so the agent knows
+    # e.g. practice-call-+919353143053-1
+    room_name = f"practice-call-{args.phone}-{args.attempt}"
     
     try:
         print(f"Creating Room {room_name} and dispatching agent...")
@@ -55,7 +59,24 @@ async def main():
     except Exception as e:
         print(f"❌ Failed to initiate call: {e}")
         print("Outcome Handling: Detected Busy, No Answer, or Invalid Number.")
-        print("Retry Rule: In a production environment, this number is now added to the retry queue for a follow-up attempt in 15 minutes.")
+        if args.attempt == 1:
+            print("Retry Rule: Scheduling a 2-minute retry since this was attempt 1.")
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            delayed_caller = os.path.join(script_dir, "delayed_caller.py")
+            # We use subprocess.Popen with creationflags/close_fds to detach it so this script can exit safely
+            kwargs = {}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            else:
+                kwargs["start_new_session"] = True
+
+            subprocess.Popen(
+                [sys.executable, delayed_caller, "--phone", args.phone, "--delay", "2", "--attempt", "2"],
+                cwd=script_dir,
+                **kwargs
+            )
+        else:
+            print("Retry Rule: This was a retry attempt. Giving up to avoid infinite loops.")
     finally:
         await lk.aclose()
 

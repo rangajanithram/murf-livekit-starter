@@ -26,7 +26,11 @@ logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
-SYSTEM_PROMPT = """
+from datetime import datetime
+
+SYSTEM_PROMPT = f"""
+[System Info: Today's date is {datetime.now().strftime('%B %d, %Y')}. When answering questions from the internet or Wikipedia, ALWAYS explicitly state this date in your answer so the user knows how current the data is. e.g., "According to data from {datetime.now().strftime('%B %d, %Y')}..."]
+
 IDENTITY: You are Lexi, a friendly, patient, and encouraging English language tutor for children in rural India, working for a grassroots literacy NGO.
 
 OBJECTIVES: 
@@ -54,7 +58,7 @@ Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
 Same rule for all non-English languages.
 
 GUARDRAILS:
-Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that a child has a learning disability or medical issue. If a child expresses extreme distress, or asks questions far beyond language learning, use this exact escalation script: "मैं यहाँ सिर्फ इंग्लिश सिखाने के लिए हूँ। अगर आपको किसी और मदद की ज़रूरत है, तो कृपया अपने माता-पिता से बात करें।"
+Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that a child has a learning disability or medical issue. If a child expresses extreme distress, or asks questions far beyond language learning (such as complex math or calculus), explain that you cannot help with that directly, but offer to open a request for a human teacher to call them using the HUMAN HANDOFF / ESCALATION rules below. Do not use a hardcoded response; respond dynamically in their preferred language.
 
 MEMORY & PROFILE:
 You have a database to remember your regular students. You MUST ask the user's permission before saving their profile.
@@ -66,9 +70,19 @@ If a user asks you to forget them, use the `forget_user` tool to delete their pr
 STYLE:
 Keep your answers extremely short, ideally just one or two simple sentences under 20 words. Speak at a relaxed, patient pace. Do not use any bullet points, asterisks, brackets, emojis, or formatting meant for a screen. 
 
-OUTCOME HANDLING RULES:
-- VOICEMAIL: If you hear a voicemail greeting (e.g., 'leave a message after the beep'), say: 'Hi, this is Lexi from your Daily Practice program. I missed you today! We will try again tomorrow. Keep up the great work!' and then immediately use the cancel_subscription tool to end the call.
-- IMMEDIATE HANGUP: If the user hangs up immediately or is busy, the system will detect the disconnect and queue a retry automatically.
+OUTCOME HANDLING RULES (VERY IMPORTANT):
+- IN-CALL RESCHEDULE: If the user says they are busy and asks you to call back later (e.g. "call me in 5 minutes"), use the `schedule_call` tool to schedule a call, say goodbye, and then use `cancel_subscription` to hang up. If they don't provide a phone number, ask for it!
+- VOICEMAIL: If you hear a voicemail greeting (e.g., 'leave a message after the beep'), check if you already know their phone number. If you do, use the `schedule_call` tool to retry in 2 minutes. Then say: 'Hi, this is Lexi from your Daily Practice program. I missed you today! We will try again later. Keep up the great work!' and immediately use the cancel_subscription tool to end the call.
+- IMMEDIATE HANGUP: Handled automatically by the system.
+
+HUMAN HANDOFF / ESCALATION (CRITICAL):
+You are an AI, but you should not solve everything. You MUST stop and escalate to a human teacher if:
+1. The learner becomes highly frustrated, upset, or angry.
+2. The learner explicitly asks to speak to a real human teacher, OR asks a highly complex grammar/language question that you are struggling to explain simply.
+When this happens, you MUST follow these exact steps:
+Step 1. Ask for permission: "It sounds like you need a bit more help! I can open a request for a human teacher to call you. Do I have your permission to share the details of our chat with them?" (DO NOT proceed unless they say yes).
+Step 2. If they say yes, ask for their phone number so the teacher can call them back. Once you have their phone number and permission, use the `create_escalation` tool to save a summary of their issue. Do not include passwords, OTPs, or private account info in the summary.
+Step 3. Give them the Reference ID returned by the tool, and tell them honestly: "I have created your request. Your reference ID is [ID]. A human teacher will review this and call you back tomorrow. Don't give up, you're doing great!"
 """
 
 
@@ -111,6 +125,64 @@ class Assistant(Agent):
         if success:
             return "Profile deleted successfully."
         return "Profile not found."
+
+    @function_tool
+    async def create_escalation(self, context: RunContext, summary: str, urgency: str, language: str, follow_up_method: str, phone_number: str):
+        """Use this tool to create a human handoff/escalation ticket. You MUST ask for permission and their phone number before calling this.
+        
+        Args:
+            summary: A brief description of the problem and what you already tried. (NO private info like passwords).
+            urgency: "low", "medium", "high", or "emergency".
+            language: The user's preferred language.
+            follow_up_method: How the human should follow up (e.g. "phone call tomorrow").
+            phone_number: The user's phone number for the teacher to call them back.
+        """
+        logger.info(f"Creating escalation for {self.user_id} with phone {phone_number}")
+        ticket_id = database.save_escalation(self.user_id, summary, urgency, language, follow_up_method, phone_number)
+        return f"Successfully created ticket. The Reference ID is {ticket_id}. Give this ID to the user and explain the next steps."
+
+    @function_tool
+    async def check_ticket_status(self, context: RunContext, ticket_id: str):
+        """Use this tool to check the status of a human help ticket if the user asks for an update on their request.
+        
+        Args:
+            ticket_id: The Reference ID of the ticket (e.g., REQ-1234).
+        """
+        logger.info(f"Checking ticket status for {ticket_id}")
+        status = database.get_escalation_status(ticket_id.upper())
+        if status == "Not Found":
+            return "Ticket not found. Make sure the ID is correct."
+        return f"The current status of {ticket_id} is: {status}"
+
+    @function_tool
+    async def schedule_call(self, context: RunContext, phone: str, delay_minutes: int):
+        """Use this tool to schedule a callback to the user after a specific delay.
+        
+        Args:
+            phone: The phone number to call (e.g., +919353143053).
+            delay_minutes: The number of minutes to wait before calling.
+        """
+        logger.info(f"Scheduling call to {phone} in {delay_minutes} minutes.")
+        import subprocess
+        import sys
+        import os
+        
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        delayed_caller = os.path.join(script_dir, "..", "delayed_caller.py")
+        
+        kwargs = {}
+        if sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+        else:
+            kwargs["start_new_session"] = True
+            
+        # Hardcode attempt=2 so it doesn't infinite loop if they miss the retry
+        subprocess.Popen(
+            [sys.executable, delayed_caller, "--phone", phone, "--delay", str(delay_minutes), "--attempt", "2"],
+            cwd=os.path.join(script_dir, ".."),
+            **kwargs
+        )
+        return f"Scheduled a call to {phone} in {delay_minutes} minutes."
 
     @function_tool
     async def cancel_subscription(self, context: RunContext):
@@ -290,8 +362,11 @@ async def my_agent(ctx: JobContext):
 
     import asyncio
 
+    user_has_spoken = False
+
     import time
     async def silent_user_handler():
+        nonlocal user_has_spoken
         last_activity = time.time()
         silence_count = 0
         
@@ -304,6 +379,9 @@ async def my_agent(ctx: JobContext):
             except Exception:
                 user_s = "unknown"
                 
+            if user_s.endswith("speaking"):
+                user_has_spoken = True
+
             # If agent is generating/speaking, or if user is currently speaking, reset the timer
             if not agent_s.endswith("listening") or user_s.endswith("speaking"):
                 last_activity = time.time()
@@ -322,26 +400,58 @@ async def my_agent(ctx: JobContext):
                 await ctx.room.disconnect()
                 break
 
-    # Wait briefly to ensure the agent's audio track is fully published
-    await asyncio.sleep(2)
-
     is_outbound = ctx.room.name.startswith("practice-call-")
 
-    try:
-        if is_outbound:
-            # Day 6 Outbound Greeting: Who's calling, why, and how to stop.
-            await session.say("Hello! This is Lexi from your Daily Practice program calling for your scheduled English lesson. If you'd like me to stop calling, just say 'cancel my subscription'. Are you ready to begin?", allow_interruptions=True)
+    if is_outbound:
+        # Wait up to 60 seconds for the SIP participant to actually join the room (i.e. user answered)
+        logger.info("Waiting for SIP participant to join...")
+        for _ in range(60):
+            has_sip = any(p.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP for p in ctx.room.remote_participants.values())
+            if has_sip:
+                break
+            await asyncio.sleep(1)
+        
+        # Wait briefly to ensure the agent's audio track is fully published and SIP audio is ready
+        await asyncio.sleep(2)
+        # Day 6 Outbound Greeting: Who's calling, why, and how to stop.
+        await session.say("Hello! This is Lexi from your Daily Practice program calling for your scheduled English lesson. If you'd like me to stop calling, just say 'cancel my subscription'. Are you ready to begin?", allow_interruptions=True)
+    else:
+        # Wait briefly to ensure the agent's audio track is fully published
+        await asyncio.sleep(2)
+        # Check if returning user
+        user_id = ctx.room.name.rsplit('_', 1)[0]
+        user = database.get_user(user_id)
+        if user:
+            await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
         else:
-            # Check if returning user
-            user_id = ctx.room.name.rsplit('_', 1)[0]
-            user = database.get_user(user_id)
-            if user:
-                await session.say(f"नमस्ते {user['name']}! आपसे दोबारा मिलकर अच्छा लगा।", allow_interruptions=True)
-            else:
-                # Initial greeting
-                await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
-    except RuntimeError as e:
-        logger.warning(f"Failed to say initial greeting (user probably hung up early): {e}")
+            # Initial greeting
+            await session.say("नमस्ते! मैं लेक्सी हूँ, आपकी इंग्लिश ट्यूटर। आज आप कैसे हैं?", allow_interruptions=True)
+
+    @ctx.room.on("participant_disconnected")
+    def on_participant_disconnected(participant: rtc.RemoteParticipant):
+        if is_outbound and participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP:
+            if not user_has_spoken:
+                parts = ctx.room.name.split('-')
+                if len(parts) >= 4:
+                    phone = parts[2]
+                    attempt = parts[3]
+                    if attempt == "1":
+                        logger.info("SIP Participant disconnected without speaking on attempt 1. Scheduling retry in 2 minutes.")
+                        import subprocess
+                        import sys
+                        import os
+                        script_dir = os.path.dirname(os.path.abspath(__file__))
+                        delayed_caller = os.path.join(script_dir, "..", "delayed_caller.py")
+                        kwargs = {}
+                        if sys.platform == "win32":
+                            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                        else:
+                            kwargs["start_new_session"] = True
+                        subprocess.Popen(
+                            [sys.executable, delayed_caller, "--phone", phone, "--delay", "2", "--attempt", "2"],
+                            cwd=os.path.join(script_dir, ".."),
+                            **kwargs
+                        )
 
     # Start the silence timeout handler ONLY AFTER the agent is connected and has greeted
     asyncio.create_task(silent_user_handler())
