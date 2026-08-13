@@ -370,9 +370,8 @@ function __OriginkitBase_MeshText(props: any) {
         // ── Resize ──────────────────────────────────────────────────────
         const resize = () => {
             const dpr = window.devicePixelRatio || 1
-            const rect = wrapper.getBoundingClientRect()
-            const w = Math.max(2, Math.round(rect.width * dpr))
-            const h = Math.max(2, Math.round(rect.height * dpr))
+            const w = Math.max(2, Math.round(wrapper.offsetWidth * dpr))
+            const h = Math.max(2, Math.round(wrapper.offsetHeight * dpr))
             if (canvas.width !== w || canvas.height !== h) {
                 canvas.width = w
                 canvas.height = h

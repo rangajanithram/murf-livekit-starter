@@ -45,6 +45,20 @@ def init_db():
             content
         )
     ''')
+
+    # Create call analytics table for Day 8
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS call_analytics (
+            call_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            channel TEXT,
+            duration INTEGER,
+            success BOOLEAN,
+            failure_reason TEXT,
+            latency REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     # Populate knowledge base if empty
     c.execute("SELECT count(*) FROM knowledge_base")
@@ -168,9 +182,9 @@ def get_escalations():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM escalations ORDER BY created_at DESC")
-    results = [dict(row) for row in c.fetchall()]
+    rows = c.fetchall()
     conn.close()
-    return results
+    return [dict(row) for row in rows]
 
 def get_escalation_status(esc_id: str):
     conn = sqlite3.connect(DB_FILE)
@@ -181,7 +195,7 @@ def get_escalation_status(esc_id: str):
     conn.close()
     if row:
         return row['status']
-    return "Not Found"
+    return None
 
 def resolve_escalation(esc_id: str):
     conn = sqlite3.connect(DB_FILE)
@@ -189,6 +203,24 @@ def resolve_escalation(esc_id: str):
     c.execute("UPDATE escalations SET status = 'RESOLVED' WHERE escalation_id = ?", (esc_id,))
     conn.commit()
     conn.close()
-    return True
+    logger.info(f"Resolved escalation {esc_id}")
 
+def save_call_analytics(call_id: str, user_id: str, channel: str, duration: int, success: bool, failure_reason: str, latency: float):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO call_analytics (call_id, user_id, channel, duration, success, failure_reason, latency)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (call_id, user_id, channel, duration, success, failure_reason, latency))
+    conn.commit()
+    conn.close()
+    logger.info(f"Saved analytics for call {call_id}: Success={success}")
 
+def get_call_analytics():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM call_analytics ORDER BY created_at DESC")
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

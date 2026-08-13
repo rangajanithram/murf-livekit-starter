@@ -1,6 +1,9 @@
 import { Button } from '@/components/ui/button';
 import MeshText from '@/components/ui/mesh-text';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { TeacherDashboard } from './teacher-dashboard';
+import { AnalyticsDashboard } from './analytics-dashboard';
 
 interface WelcomeViewProps {
   onStartCall: () => void;
@@ -35,6 +38,8 @@ export const WelcomeView = ({
   const [isFocused, setIsFocused] = useState(false);
   const [isCalling, setIsCalling] = useState(false);
   const [callStatus, setCallStatus] = useState('');
+  
+  const [activeTab, setActiveTab] = useState<'home' | 'teacher' | 'analytics'>('home');
 
   const displayPhone = !isFocused && phone.length >= 4 
     ? 'x'.repeat(phone.length - 4) + phone.slice(-4) 
@@ -64,89 +69,137 @@ export const WelcomeView = ({
   return (
     <div ref={ref} className="relative w-full h-full min-h-screen overflow-hidden flex flex-col items-center justify-center text-center px-4">
       {/* Top Right Controls */}
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-4">
-        {/* Teacher Dashboard Link */}
-        <a 
-          href="/escalations" 
-          target="_blank"
-          className="px-4 py-2 font-mono text-sm font-bold border-2 sketchy-box transition-all bg-white text-[#ba1a1a] border-[#ba1a1a] hover:bg-[#ba1a1a] hover:text-white flex items-center gap-2"
-        >
-          <span className="material-symbols-outlined text-sm">support_agent</span>
-          Teacher Dashboard
-        </a>
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-4 flex-wrap justify-end">
+        {activeTab === 'home' && (
+          <>
+            <button 
+              onClick={() => setActiveTab('analytics')}
+              className="px-4 py-2 font-mono text-sm font-bold border-2 sketchy-box transition-all bg-white text-[#0066cc] border-[#0066cc] hover:bg-[#0066cc] hover:text-white flex items-center gap-2 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">analytics</span>
+              Analytics Dashboard
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('teacher')}
+              className="px-4 py-2 font-mono text-sm font-bold border-2 sketchy-box transition-all bg-white text-[#ba1a1a] border-[#ba1a1a] hover:bg-[#ba1a1a] hover:text-white flex items-center gap-2 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">support_agent</span>
+              Teacher Dashboard
+            </button>
+          </>
+        )}
 
         {/* Language Toggle */}
         <div className="flex gap-2">
           <button 
             onClick={() => onLanguageChange('en')}
-            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'en' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
+            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all cursor-pointer ${language === 'en' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
           >
             EN
           </button>
           <button 
             onClick={() => onLanguageChange('hi')}
-            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all ${language === 'hi' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
+            className={`px-3 py-1 font-mono text-sm font-bold border-2 sketchy-box transition-all cursor-pointer ${language === 'hi' ? 'bg-[#002045] text-white border-[#002045]' : 'bg-white text-[#002045] border-[#002045]'}`}
           >
             HI
           </button>
         </div>
       </div>
 
-      <section className="relative z-10 flex flex-col items-center justify-center w-full px-4">
-        {/* MeshText Heading */}
-        <div className="w-[800px] max-w-full h-[140px] sm:h-[200px] md:h-[240px] mb-4 sm:mb-8 transform -rotate-1">
-          <MeshText 
-            text="Lexi AI" 
-            color="#002045"
-            colorSplit={true} 
-            customColors={["#1a365d", "#003f25"]} 
-          />
-        </div>
-
-        <p className="font-mono text-base sm:text-lg text-[#002045] w-full max-w-md mx-auto mb-8 sm:mb-12 transform rotate-1 bg-white/50 backdrop-blur-sm p-3 sm:p-4 rounded-xl sketchy-border pencil-shadow">
-          {isReconnect ? t.reconnect : t.desc}
-        </p>
-
-        <Button
-          size="lg"
-          onClick={onStartCall}
-          className="mt-2 sm:mt-6 w-full max-w-[320px] h-14 sm:h-16 bg-[#ffffff] border-2 border-[#002045] text-[#002045] hover:bg-[#f2e580] sketchy-box pencil-shadow transition-all duration-300 z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 group font-mono text-lg sm:text-xl font-bold tracking-wider"
-        >
-          <span className="material-symbols-outlined text-2xl sm:text-3xl group-hover:rotate-12 transition-transform">edit</span>
-          {isReconnect && language === 'en' ? 'Start Again' : isReconnect && language === 'hi' ? 'फिर से शुरू करें' : t.start}
-        </Button>
-
-        {/* Call Me Feature */}
-        <div className="mt-8 flex flex-col items-center gap-3 z-50 w-full max-w-[320px] p-4 bg-white/70 backdrop-blur-md rounded-xl border-2 border-[#002045] sketchy-box shadow-md pointer-events-auto">
-          <p className="font-mono text-sm font-bold text-[#002045]">Or get a phone call from Lexi!</p>
-          <input
-            type={isFocused ? "tel" : "text"}
-            placeholder="e.g. +919353143053"
-            value={displayPhone}
-            onChange={(e) => {
-              // Only update if they are actively typing (focused).
-              // If not focused, ignore the change to prevent masking issues.
-              if (isFocused) {
-                setPhone(e.target.value);
-              }
-            }}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            className="w-full px-3 py-2 border-2 border-[#002045] rounded-md font-mono text-sm focus:outline-none focus:bg-[#f2e580]/30"
-          />
-          <Button
-            size="sm"
-            onClick={handleCallMe}
-            disabled={isCalling || !phone}
-            className="w-full bg-[#002045] text-white hover:bg-[#1a365d] border-2 border-transparent hover:border-[#f2e580] font-mono text-sm font-bold transition-all disabled:opacity-50"
+      {/* Morphing Lexi AI Heading */}
+      <AnimatePresence>
+        {activeTab === 'home' ? (
+          <motion.div 
+            layoutId="lexi-heading"
+            className="w-[800px] max-w-full h-[140px] sm:h-[200px] md:h-[240px] mb-4 sm:mb-8 transform -rotate-1 relative z-20"
           >
-            {isCalling ? 'Dialing...' : 'Call Me'}
-          </Button>
-          {callStatus && (
-            <p className="font-mono text-xs text-[#ba1a1a] font-bold mt-1 animate-pulse">{callStatus}</p>
-          )}
-        </div>
-      </section>
+            <MeshText 
+              text="Lexi AI" 
+              color="#002045"
+              colorSplit={true} 
+              customColors={["#1a365d", "#003f25"]} 
+            />
+          </motion.div>
+        ) : (
+          <motion.div 
+            layoutId="lexi-heading"
+            className="absolute top-6 left-[250px] z-50 w-[180px] h-[55px]"
+          >
+            <MeshText 
+              text="Lexi AI" 
+              color="#002045"
+              colorSplit={true} 
+              customColors={["#1a365d", "#003f25"]} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'home' && (
+          <motion.section 
+            key="home"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="relative z-10 flex flex-col items-center justify-center w-full px-4"
+          >
+            <p className="font-mono text-base sm:text-lg text-[#002045] w-full max-w-md mx-auto mb-8 sm:mb-12 transform rotate-1 bg-white/50 backdrop-blur-sm p-3 sm:p-4 rounded-xl sketchy-border pencil-shadow">
+              {isReconnect ? t.reconnect : t.desc}
+            </p>
+
+            <Button
+              size="lg"
+              onClick={onStartCall}
+              className="mt-2 sm:mt-6 w-full max-w-[320px] h-14 sm:h-16 bg-[#ffffff] border-2 border-[#002045] text-[#002045] hover:bg-[#f2e580] sketchy-box pencil-shadow transition-all duration-300 z-50 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 group font-mono text-lg sm:text-xl font-bold tracking-wider"
+            >
+              <span className="material-symbols-outlined text-2xl sm:text-3xl group-hover:rotate-12 transition-transform">edit</span>
+              {isReconnect && language === 'en' ? 'Start Again' : isReconnect && language === 'hi' ? 'फिर से शुरू करें' : t.start}
+            </Button>
+
+            {/* Call Me Feature */}
+            <div className="mt-8 flex flex-col items-center gap-3 z-50 w-full max-w-[320px] p-4 bg-white/70 backdrop-blur-md rounded-xl border-2 border-[#002045] sketchy-box shadow-md pointer-events-auto">
+              <p className="font-mono text-sm font-bold text-[#002045]">Or get a phone call from Lexi!</p>
+              <input
+                type={isFocused ? "tel" : "text"}
+                placeholder="e.g. +919353143053"
+                value={displayPhone}
+                onChange={(e) => {
+                  if (isFocused) setPhone(e.target.value);
+                }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                className="w-full px-3 py-2 border-2 border-[#002045] rounded-md font-mono text-sm focus:outline-none focus:bg-[#f2e580]/30"
+              />
+              <Button
+                size="sm"
+                onClick={handleCallMe}
+                disabled={isCalling || !phone}
+                className="w-full bg-[#002045] text-white hover:bg-[#1a365d] border-2 border-transparent hover:border-[#f2e580] font-mono text-sm font-bold transition-all disabled:opacity-50"
+              >
+                {isCalling ? 'Dialing...' : 'Call Me'}
+              </Button>
+              {callStatus && (
+                <p className="font-mono text-xs text-[#ba1a1a] font-bold mt-1 animate-pulse">{callStatus}</p>
+              )}
+            </div>
+          </motion.section>
+        )}
+
+        {activeTab === 'teacher' && (
+          <motion.div key="teacher" className="w-full h-full flex justify-center items-center relative z-20 pt-16">
+            <TeacherDashboard onBack={() => setActiveTab('home')} />
+          </motion.div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <motion.div key="analytics" className="w-full h-full flex justify-center items-center relative z-20 pt-16">
+            <AnalyticsDashboard onBack={() => setActiveTab('home')} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Decorative Doodles */}
       <div className="absolute top-1/4 right-[15%] opacity-20 rotate-12 pointer-events-none animate-scribble">
@@ -194,4 +247,3 @@ export const WelcomeView = ({
     </div>
   );
 };
-

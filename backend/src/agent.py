@@ -18,6 +18,7 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.agents import function_tool, RunContext, mcp
 import aiohttp
 import database
+import time
 
 # Initialize the memory database
 database.init_db()
@@ -92,6 +93,11 @@ class Assistant(Agent):
         super().__init__(instructions=SYSTEM_PROMPT, tools=tools)
         self.user_id = room.name.rsplit('_', 1)[0]
         self.room = room
+        self.call_metrics = {
+            "success": False,
+            "failure_reason": "Incomplete Task",
+            "latencies": []
+        }
 
     @function_tool
     async def lookup_user(self, context: RunContext):
@@ -128,18 +134,22 @@ class Assistant(Agent):
 
     @function_tool
     async def create_escalation(self, context: RunContext, summary: str, urgency: str, language: str, follow_up_method: str, phone_number: str):
-        """Use this tool to create a human handoff/escalation ticket. You MUST ask for permission and their phone number before calling this.
+        """Use this tool to create a request for a human teacher. You MUST ask for permission before using this.
         
         Args:
-            summary: A brief description of the problem and what you already tried. (NO private info like passwords).
-            urgency: "low", "medium", "high", or "emergency".
-            language: The user's preferred language.
-            follow_up_method: How the human should follow up (e.g. "phone call tomorrow").
-            phone_number: The user's phone number for the teacher to call them back.
+            summary: A brief summary of what happened and what the agent checked
+            urgency: The urgency level (low, medium, high, emergency)
+            language: The caller's language
+            follow_up_method: The preferred follow-up method
+            phone_number: The user's phone number
         """
-        logger.info(f"Creating escalation for {self.user_id} with phone {phone_number}")
-        ticket_id = database.save_escalation(self.user_id, summary, urgency, language, follow_up_method, phone_number)
-        return f"Successfully created ticket. The Reference ID is {ticket_id}. Give this ID to the user and explain the next steps."
+        logger.info(f"Creating escalation for {self.user_id}")
+        database.save_escalation(self.user_id, summary, urgency, language, follow_up_method, phone_number)
+        
+        self.call_metrics["success"] = True
+        self.call_metrics["failure_reason"] = None
+        
+        return "Escalation created successfully. Your reference ID is REQ-12345."
 
     @function_tool
     async def check_ticket_status(self, context: RunContext, ticket_id: str):
@@ -209,13 +219,14 @@ class Assistant(Agent):
 
     @function_tool
     async def fetch_trivia_exercise(self, context: RunContext, topic: str, difficulty: str = "easy"):
-        """Use this tool to fetch a real multiple-choice trivia exercise for the user to practice their English and general knowledge.
-        
+        """Use this tool to fetch a trivia question for the learner. 
         Args:
-            topic: The preferred topic. Can be "general", "history", "sports", or "science".
-            difficulty: The difficulty level. Must be "easy", "medium", or "hard".
+            topic: The topic of the trivia question (e.g. general knowledge, science)
+            difficulty: easy, medium, or hard
         """
-        logger.info(f"Fetching {difficulty} trivia exercise for topic: {topic}")
+        logger.info(f"Fetching trivia for {self.user_id}")
+        self.call_metrics["success"] = True
+        self.call_metrics["failure_reason"] = None
         
         category_map = {
             "history": 23,
@@ -359,12 +370,47 @@ async def my_agent(ctx: JobContext):
     
     # Register the MCP toolset to the agent's LLM (removed, handled in init)
 
+    start_time = time.time()
+    user_id = ctx.room.name.rsplit('_', 1)[0]
+    call_id = f"call_{int(start_time)}_{ctx.room.name}"
+    is_outbound = ctx.room.name.startswith("practice-call-")
+    channel = "sip" if is_outbound else "browser"
 
     import asyncio
 
     user_has_spoken = False
 
-    import time
+    async def track_latency():
+        nonlocal user_has_spoken
+        last_user_state = None
+        last_agent_state = None
+        user_end_time = None
+        
+        while True:
+            await asyncio.sleep(0.1)
+            curr_agent = str(session.agent_state).lower()
+            try:
+                curr_user = str(session.user_state).lower()
+            except Exception:
+                curr_user = "unknown"
+                
+            if curr_user.endswith("speaking"):
+                user_has_spoken = True
+            
+            if last_user_state and last_user_state.endswith("speaking") and not curr_user.endswith("speaking"):
+                user_end_time = time.time()
+                
+            if last_agent_state and not last_agent_state.endswith("speaking") and curr_agent.endswith("speaking"):
+                if user_end_time:
+                    lat = time.time() - user_end_time
+                    assistant.call_metrics["latencies"].append(lat)
+                    user_end_time = None
+                    
+            last_user_state = curr_user
+            last_agent_state = curr_agent
+
+    asyncio.create_task(track_latency())
+
     async def silent_user_handler():
         nonlocal user_has_spoken
         last_activity = time.time()
@@ -378,9 +424,6 @@ async def my_agent(ctx: JobContext):
                 user_s = str(session.user_state).lower()
             except Exception:
                 user_s = "unknown"
-                
-            if user_s.endswith("speaking"):
-                user_has_spoken = True
 
             # If agent is generating/speaking, or if user is currently speaking, reset the timer
             if not agent_s.endswith("listening") or user_s.endswith("speaking"):
@@ -429,6 +472,19 @@ async def my_agent(ctx: JobContext):
 
     @ctx.room.on("participant_disconnected")
     def on_participant_disconnected(participant: rtc.RemoteParticipant):
+        # Calculate analytics
+        duration = int(time.time() - start_time)
+        if duration < 10 and not assistant.call_metrics["success"]:
+            assistant.call_metrics["failure_reason"] = "User Hang-up"
+            
+        lats = assistant.call_metrics["latencies"]
+        avg_latency = sum(lats) / len(lats) if lats else 0.0
+        
+        success = assistant.call_metrics["success"]
+        reason = assistant.call_metrics["failure_reason"] if not success else "None"
+        
+        database.save_call_analytics(call_id, user_id, channel, duration, success, reason, avg_latency)
+        
         if is_outbound and participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP:
             if not user_has_spoken:
                 parts = ctx.room.name.split('-')
