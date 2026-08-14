@@ -8,13 +8,13 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    ChatContext,
     cli,
     inference,
     tokenize,
     room_io,
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.agents import function_tool, RunContext, mcp
 import aiohttp
 import database
@@ -59,7 +59,7 @@ Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
 Same rule for all non-English languages.
 
 GUARDRAILS:
-Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that a child has a learning disability or medical issue. If a child expresses extreme distress, or asks questions far beyond language learning (such as complex math or calculus), explain that you cannot help with that directly, but offer to open a request for a human teacher to call them using the HUMAN HANDOFF / ESCALATION rules below. Do not use a hardcoded response; respond dynamically in their preferred language.
+Never shame, scold, or make fun of a wrong answer. Never claim or diagnose that a child has a learning disability or medical issue. If a child expresses extreme distress, or asks questions far beyond language learning (such as advanced medical questions or calculus), explain that you cannot help with that directly, but offer to open a request for a human teacher to call them using the HUMAN HANDOFF / ESCALATION rules below. Do not use a hardcoded response; respond dynamically in their preferred language.
 
 MEMORY & PROFILE:
 You have a database to remember your regular students. You MUST ask the user's permission before saving their profile.
@@ -72,6 +72,7 @@ STYLE:
 Keep your answers extremely short, ideally just one or two simple sentences under 20 words. Speak at a relaxed, patient pace. Do not use any bullet points, asterisks, brackets, emojis, or formatting meant for a screen. 
 
 OUTCOME HANDLING RULES (VERY IMPORTANT):
+- MATH QUESTIONS: If the user asks a simple math question (like 2+2 or 5x5), solve it yourself to practice English numbers. BUT if the user asks a hard or complex math question (like large multiplications, algebra, or fractions), you MUST immediately use the `transfer_to_maths_specialist` tool to transfer them to Calci. DO NOT ask for their permission to transfer them to Calci, just use the tool!
 - IN-CALL RESCHEDULE: If the user says they are busy and asks you to call back later (e.g. "call me in 5 minutes"), use the `schedule_call` tool to schedule a call, say goodbye, and then use `cancel_subscription` to hang up. If they don't provide a phone number, ask for it!
 - VOICEMAIL: If you hear a voicemail greeting (e.g., 'leave a message after the beep'), check if you already know their phone number. If you do, use the `schedule_call` tool to retry in 2 minutes. Then say: 'Hi, this is Lexi from your Daily Practice program. I missed you today! We will try again later. Keep up the great work!' and immediately use the cancel_subscription tool to end the call.
 - IMMEDIATE HANGUP: Handled automatically by the system.
@@ -86,6 +87,50 @@ Step 2. If they say yes, ask for their phone number so the teacher can call them
 Step 3. Give them the Reference ID returned by the tool, and tell them honestly: "I have created your request. Your reference ID is [ID]. A human teacher will review this and call you back tomorrow. Don't give up, you're doing great!"
 """
 
+MATHS_PROMPT = """
+IDENTITY: You are Calci, an expert Maths Specialist for children in rural India.
+OBJECTIVES: Help the child solve hard or complex math problems.
+If the child asks about anything other than math, or says they are done with math, you MUST use the `transfer_to_main_agent` tool to send them back to Lexi.
+Keep your answers very short. Be encouraging. 
+Speak mostly in Hindi but teach the English words for numbers.
+"""
+
+class MathsSpecialist(Agent):
+    def __init__(self, room: rtc.Room, user_id: str, call_metrics: dict, main_agent: Agent, chat_ctx: ChatContext | None = None) -> None:
+        super().__init__(
+            instructions=MATHS_PROMPT,
+            chat_ctx=chat_ctx,
+            tts=murf.TTS(
+                voice="Pooja",  # Female voice
+                style="Conversation",
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                text_pacing=True,
+            ),
+        )
+        self.room = room
+        self.user_id = user_id
+        self.call_metrics = call_metrics
+        self.main_agent = main_agent
+
+    async def on_enter(self) -> None:
+        # Introduce self when taking over
+        await self.session.generate_reply(
+            instructions="Introduce yourself as Calci, the maths specialist. Tell the user you are here to help them solve their complex math problem."
+        )
+
+    @function_tool
+    async def transfer_to_main_agent(self, context: RunContext) -> tuple[Agent, str]:
+        """Transfer the user back to the main English tutor agent when they are done with math or ask a non-math question."""
+        logger.info("Transferring back to main agent Lexi")
+        # We must create a new Assistant instance because the old one's activity is closed
+        new_main_agent = Assistant(room=self.room)
+        # Copy tools (including dynamically added MCP tools) from the original agent if possible
+        if hasattr(self.main_agent, "_opts") and hasattr(self.main_agent._opts, "tools"):
+            new_main_agent._opts.tools = self.main_agent._opts.tools
+        new_main_agent.chat_ctx.messages().clear()
+        new_main_agent.chat_ctx.messages().extend(self.chat_ctx.messages())
+        return new_main_agent, "I will now transfer you back to Lexi for your language practice!"
+
 
 class Assistant(Agent):
     def __init__(self, room: rtc.Room, additional_tools: list = None) -> None:
@@ -98,6 +143,19 @@ class Assistant(Agent):
             "failure_reason": "Incomplete Task",
             "latencies": []
         }
+
+    @function_tool
+    async def transfer_to_maths_specialist(self, context: RunContext) -> tuple[Agent, str]:
+        """Use this tool to transfer the user to the Maths Specialist, Calci, ONLY for hard or complex math questions. If the user asks a simple math question (like 2+2), solve it yourself and DO NOT transfer."""
+        logger.info(f"Transferring {self.user_id} to Maths Specialist")
+        maths_agent = MathsSpecialist(
+            room=self.room,
+            user_id=self.user_id,
+            call_metrics=self.call_metrics,
+            main_agent=self,
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True)
+        )
+        return maths_agent, "This sounds like a complex math problem! I will connect you to our maths specialist, Calci."
 
     @function_tool
     async def lookup_user(self, context: RunContext):
@@ -199,9 +257,12 @@ class Assistant(Agent):
         """Use this tool to cancel the user's daily practice subscription and end the call immediately."""
         logger.info("Canceling subscription and ending call.")
         import asyncio
-        if self.room:
-            asyncio.create_task(self.room.disconnect())
-        return "Subscription canceled. The call is now ending."
+        async def delayed_disconnect():
+            await asyncio.sleep(8)
+            if self.room:
+                await self.room.disconnect()
+        asyncio.create_task(delayed_disconnect())
+        return "Subscription canceled. Say goodbye quickly and clearly."
 
     @function_tool
     async def search_knowledge(self, context: RunContext, query: str):
@@ -303,7 +364,6 @@ async def my_agent(ctx: JobContext):
             ),
         # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
         # See more at https://docs.livekit.io/agents/build/turns
-        turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
         # allow the LLM to generate a response while waiting for the end of turn
         # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation

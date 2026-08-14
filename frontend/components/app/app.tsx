@@ -13,6 +13,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { getSandboxTokenSource } from '@/lib/utils';
+import { Sidebar } from '@/components/app/sidebar';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 
@@ -36,9 +37,9 @@ function Clock() {
   if (!mounted) return null;
 
   return (
-    <div className="absolute top-4 left-4 z-50 p-4 rounded-xl shadow-lg border-2 sketchy-border pencil-shadow bg-background/80 backdrop-blur transform -rotate-2">
-      <div className="text-xl font-bold">{time.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</div>
-      <div className="text-2xl font-mono text-primary">{time.toLocaleTimeString()}</div>
+    <div className="absolute top-[20px] left-[20px] z-50 p-2 px-4 rounded-xl shadow-sm border-2 sketchy-border pencil-shadow bg-background/80 backdrop-blur transform -rotate-2">
+      <div className="text-sm font-bold">{time.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+      <div className="text-lg font-mono text-primary">{time.toLocaleTimeString()}</div>
     </div>
   );
 }
@@ -81,11 +82,12 @@ export function App({ appConfig }: AppProps) {
     <AgentSessionProvider session={session} volume={volume}>
       <AppSetup />
       <Clock />
+      <Sidebar />
       <SettingsPanel uiSize={uiSize} setUiSize={setUiSize} volume={volume} setVolume={setVolume} />
       <div className="w-full h-full ruled-bg relative">
         <div className="margin-line"></div>
         <div className="margin-line-horizontal"></div>
-        <main className="grid h-svh grid-cols-1 place-content-center">
+        <main className="grid h-svh grid-cols-1 place-content-center pl-[380px]">
           <ViewController appConfig={appConfig} />
         </main>
       </div>

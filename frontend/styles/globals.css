@@ -173,7 +173,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 12%;
+    left: 380px; /* Increased from 12% to make room for Sidebar */
     width: 2px;
     background-color: rgba(186, 26, 26, 0.4);
     z-index: -1;
@@ -183,7 +183,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 130px;
+    top: 110px; /* Adjusted to fit the clock perfectly */
     height: 2px;
     background-color: rgba(186, 26, 26, 0.4);
     z-index: -1;

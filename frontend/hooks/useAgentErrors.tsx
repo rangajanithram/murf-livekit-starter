@@ -4,6 +4,8 @@ import { useAgent, useSessionContext } from '@livekit/components-react';
 import { WarningIcon } from '@phosphor-icons/react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+import { useNotifications } from './useNotifications';
+
 interface ToastProps {
   title: ReactNode;
   description: ReactNode;
@@ -11,6 +13,12 @@ interface ToastProps {
 
 function toastAlert(toast: ToastProps) {
   const { title, description } = toast;
+  
+  // Also push to our persistent store
+  useNotifications.getState().addNotification(
+    title as string, 
+    description ? "Check toast for details" : undefined
+  );
 
   return sonnerToast.error(title, {
     description: description,

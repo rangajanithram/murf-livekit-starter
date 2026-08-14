@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TeacherDashboard } from './teacher-dashboard';
 import { AnalyticsDashboard } from './analytics-dashboard';
+import { useAppState } from '@/hooks/useAppState';
 
 interface WelcomeViewProps {
   onStartCall: () => void;
@@ -39,7 +40,7 @@ export const WelcomeView = ({
   const [isCalling, setIsCalling] = useState(false);
   const [callStatus, setCallStatus] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'home' | 'teacher' | 'analytics'>('home');
+  const { activeTab, setActiveTab } = useAppState();
 
   const displayPhone = !isFocused && phone.length >= 4 
     ? 'x'.repeat(phone.length - 4) + phone.slice(-4) 
