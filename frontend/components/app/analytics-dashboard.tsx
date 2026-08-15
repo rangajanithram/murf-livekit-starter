@@ -122,14 +122,17 @@ export function AnalyticsDashboard({ onBack }: AnalyticsDashboardProps) {
       <div className="border-2 sketchy-box p-6 bg-white/50 mb-8">
         <h3 className="text-lg font-bold text-[#002045] mb-4">Results Over Time</h3>
         <div className="flex items-end gap-1 h-32 overflow-hidden border-b-2 sketchy-border border-[#002045]/20 pb-2">
-          {filteredAnalytics.slice().reverse().map((call, i) => (
-            <div 
-              key={i} 
-              className={`w-6 flex-shrink-0 sketchy-box transition-all hover:opacity-80 ${call.success ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'}`}
-              style={{ height: Math.max(10, Math.min(100, call.duration * 2)) + '%' }}
-              title={`${call.success ? 'Success' : 'Failure'} (${call.duration}s)`}
-            />
-          ))}
+          {(() => {
+            const maxDuration = Math.max(...filteredAnalytics.map(c => c.duration || 1));
+            return filteredAnalytics.slice().reverse().map((call, i) => (
+              <div 
+                key={i} 
+                className={`w-6 flex-shrink-0 sketchy-box transition-all hover:opacity-80 ${call.success ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'}`}
+                style={{ height: `${Math.max(5, (call.duration / maxDuration) * 100)}%` }}
+                title={`${call.success ? 'Success' : 'Failure'} (${call.duration}s)`}
+              />
+            ));
+          })()}
           {filteredAnalytics.length === 0 && (
             <div className="w-full text-center text-[#002045]/50 font-mono text-sm pt-10">No data to chart</div>
           )}

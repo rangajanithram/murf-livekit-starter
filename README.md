@@ -1,6 +1,8 @@
-# Voice Agent Starter — Powered by Murf Falcon
+# Lexi & Calci: Multi-Agent AI Voice Tutors
 
-Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on the market - swap the system prompt to build anything from customer support to language tutors.
+Built for the **10 Days of Voice Agents — VoiceForBharat Edition** (Learning & Literacy Track).
+
+This project features an interactive, real-time AI voice platform designed to help students practice English without the fear of judgment. It utilizes a programmatic multi-agent handoff between a primary English tutor (Lexi) and a math specialist (Calci), persistent memory, and dynamic WebRTC UI dashboards to deliver sub-200ms conversational latency using **Murf Falcon TTS** and **LiveKit Agents**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming) [![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io) [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
