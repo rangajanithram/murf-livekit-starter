@@ -322,7 +322,7 @@ class Assistant(Agent):
             return "The live exercise database seems to be offline or timed out. Let's practice normal conversation instead!"
 
 
-server = AgentServer(load_threshold=10.0, num_idle_processes=1)
+server = AgentServer(load_threshold=10.0, num_idle_processes=0)
 
 
 def prewarm(proc: JobProcess):
