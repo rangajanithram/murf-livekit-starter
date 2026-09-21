@@ -111,7 +111,7 @@ export function AnalyticsDashboard({ onBack }: AnalyticsDashboardProps) {
             {Object.entries(failureReasons).map(([reason, count]) => (
               <div key={reason} className="bg-red-50 text-red-800 px-4 py-2 border-2 sketchy-border border-red-200 flex items-center gap-2">
                 <span className="font-semibold">{reason}:</span>
-                <span className="font-mono font-bold text-lg">{count}</span>
+                <span className="font-mono font-bold text-lg">{String(count)}</span>
               </div>
             ))}
           </div>
